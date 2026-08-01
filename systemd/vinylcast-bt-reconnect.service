@@ -1,0 +1,14 @@
+[Unit]
+Description=vinylcast — auto-reconnect the Bluetooth turntable (A2DP source -> this sink)
+After=bluetooth.service bluealsa.service
+Wants=bluetooth.service
+
+[Service]
+Type=simple
+EnvironmentFile=/etc/vinylcast/config.env
+ExecStart=/opt/vinylcast/bt-reconnect.sh
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target

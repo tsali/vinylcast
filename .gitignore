@@ -1,0 +1,5 @@
+# never commit a real config
+config.env
+*.raw
+__pycache__/
+*.pyc
