@@ -1,0 +1,251 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Vinyl EQ</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;background:#07070a;overflow:hidden;
+    font-family:"DejaVu Sans Mono",ui-monospace,Menlo,Consolas,monospace;color:#8a97a3}
+  body{display:flex;flex-direction:column;background:radial-gradient(120% 90% at 50% -10%,#12151c 0%,#07070a 60%)}
+  header{display:flex;align-items:center;gap:.8rem;padding:14px 20px 6px;
+    letter-spacing:.28em;text-transform:uppercase;font-size:clamp(11px,1.6vw,15px)}
+  header .title{color:#e9eef3;font-weight:700}
+  header .live{display:inline-flex;align-items:center;gap:.5em;color:#4a5560;margin-left:auto}
+  header .dot{width:10px;height:10px;border-radius:50%;background:#333}
+  header.on .live{color:#ff3b30}
+  header.on .dot{background:#ff3b30;animation:pulse 1.4s ease-in-out infinite}
+  @keyframes pulse{0%,100%{box-shadow:0 0 0 0 rgba(255,59,48,.55)}50%{box-shadow:0 0 0 7px rgba(255,59,48,0)}}
+  #gear{margin-left:14px;cursor:pointer;color:#5a6570;font-size:18px;line-height:1;user-select:none}
+  #gear:hover{color:#e9eef3}
+  #stage{flex:1;display:flex;flex-direction:column;gap:10px;padding:6px 16px 8px}
+  .chan{position:relative;flex:1;background:linear-gradient(180deg,#0f1217,#0a0c10);
+    border:1px solid #1c2128;border-radius:10px;overflow:hidden;box-shadow:inset 0 0 40px rgba(0,0,0,.6)}
+  .chan .lbl{position:absolute;top:8px;left:12px;font-size:clamp(12px,2vw,20px);
+    font-weight:700;letter-spacing:.2em;color:#39424d;z-index:2}
+  canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  footer{display:flex;justify-content:space-between;padding:2px 20px 12px;
+    font-size:11px;letter-spacing:.15em;color:#4a5560;text-transform:uppercase}
+  /* settings drawer */
+  #panel{position:fixed;top:0;right:0;height:100%;width:min(340px,90vw);z-index:20;
+    background:#0c0f14;border-left:1px solid #1c2128;box-shadow:-20px 0 50px rgba(0,0,0,.6);
+    transform:translateX(100%);transition:transform .22s ease;overflow-y:auto;padding:18px 18px 40px}
+  #panel.open{transform:translateX(0)}
+  #panel h2{color:#e9eef3;font-size:13px;letter-spacing:.22em;text-transform:uppercase;margin-bottom:2px}
+  #panel .sub{font-size:11px;color:#4a5560;margin-bottom:16px}
+  .row{margin:12px 0;display:flex;flex-direction:column;gap:5px}
+  .row label{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#8a97a3;
+    display:flex;justify-content:space-between;align-items:center}
+  .row label .val{color:#39ff6a;font-weight:700}
+  input[type=range]{width:100%;accent-color:#39ff6a;background:transparent}
+  input[type=color]{width:40px;height:26px;border:1px solid #2a323b;border-radius:6px;background:#0c0f14;padding:0;cursor:pointer}
+  .colors{display:grid;grid-template-columns:repeat(2,1fr);gap:8px 14px}
+  .colors .c{display:flex;align-items:center;justify-content:space-between;font-size:11px;
+    text-transform:uppercase;letter-spacing:.06em;color:#8a97a3}
+  .toggle{display:flex;align-items:center;justify-content:space-between;font-size:11px;
+    text-transform:uppercase;letter-spacing:.1em;color:#8a97a3}
+  input[type=checkbox]{width:18px;height:18px;accent-color:#39ff6a}
+  hr{border:none;border-top:1px solid #171b21;margin:16px 0}
+  .btns{display:flex;gap:10px;margin-top:8px}
+  .btns button{flex:1;padding:9px;background:#141922;color:#c8d2dc;border:1px solid #263039;
+    border-radius:7px;font:inherit;font-size:11px;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+  .btns button:hover{background:#1b222c;color:#fff}
+  #panel .close{position:absolute;top:14px;right:16px;cursor:pointer;color:#5a6570;font-size:20px}
+  #panel .close:hover{color:#fff}
+</style>
+</head>
+<body>
+  <header id="hdr">
+    <span class="title">◉ Vinyl</span><span style="color:#4a5560">Stereo Graphic EQ</span>
+    <span class="live"><span class="dot"></span><span id="status">no signal</span></span>
+    <span id="gear" title="settings">⚙</span>
+  </header>
+  <div id="stage">
+    <div class="chan"><span class="lbl">L</span><canvas id="cL"></canvas></div>
+    <div class="chan"><span class="lbl">R</span><canvas id="cR"></canvas></div>
+  </div>
+  <footer><span id="foot">20 bands</span><span id="src">stream</span></footer>
+
+  <aside id="panel">
+    <span class="close" id="closeP">✕</span>
+    <h2>EQ Settings</h2><div class="sub">live · saved to this browser</div>
+
+    <div class="row"><label>Bands <span class="val" id="v_bands"></span></label><input type="range" id="bands" min="8" max="40" step="1"></div>
+    <div class="row"><label>Segments per bar <span class="val" id="v_segments"></span></label><input type="range" id="segments" min="10" max="48" step="1"></div>
+    <div class="row"><label>Sensitivity (hot ↔ calm) <span class="val" id="v_maxDb"></span></label><input type="range" id="maxDb" min="-30" max="-6" step="1"></div>
+    <div class="row"><label>Treble tilt <span class="val" id="v_tilt"></span></label><input type="range" id="tilt" min="0" max="4" step="0.1"></div>
+    <div class="row"><label>Low cutoff <span class="val" id="v_fmin"></span></label><input type="range" id="fmin" min="20" max="500" step="5"></div>
+    <div class="row"><label>High cutoff <span class="val" id="v_fmax"></span></label><input type="range" id="fmax" min="3000" max="20000" step="250"></div>
+    <div class="row"><label>Smoothing <span class="val" id="v_smoothing"></span></label><input type="range" id="smoothing" min="0" max="0.95" step="0.01"></div>
+    <div class="row"><label>Bar fall speed <span class="val" id="v_release"></span></label><input type="range" id="release" min="0.5" max="0.97" step="0.01"></div>
+    <hr>
+    <div class="row"><div class="toggle"><span>Peak hold</span><input type="checkbox" id="peakHold"></div></div>
+    <div class="row"><label>Peak hold time <span class="val" id="v_peakHoldMs"></span></label><input type="range" id="peakHoldMs" min="0" max="2000" step="50"></div>
+    <div class="row"><label>Peak fall speed <span class="val" id="v_peakFall"></span></label><input type="range" id="peakFall" min="0.001" max="0.03" step="0.001"></div>
+    <hr>
+    <div class="row"><div class="toggle"><span>Frequency labels</span><input type="checkbox" id="labels"></div></div>
+    <div class="row"><label>Color split · low→mid <span class="val" id="v_splitMid"></span></label><input type="range" id="splitMid" min="0.2" max="0.9" step="0.02"></div>
+    <div class="row"><label>Color split · mid→high <span class="val" id="v_splitHigh"></span></label><input type="range" id="splitHigh" min="0.4" max="0.98" step="0.02"></div>
+    <div class="colors">
+      <div class="c"><span>Low</span><input type="color" id="colLow"></div>
+      <div class="c"><span>Mid</span><input type="color" id="colMid"></div>
+      <div class="c"><span>High</span><input type="color" id="colHigh"></div>
+      <div class="c"><span>Peak</span><input type="color" id="colPeak"></div>
+      <div class="c"><span>Off</span><input type="color" id="colOff"></div>
+    </div>
+    <div class="btns"><button id="reset">Reset defaults</button></div>
+  </aside>
+
+<script>
+(() => {
+  const DEFAULTS = {
+    stream:"http://192.168.1.158:8005/live",
+    bands:20, segments:28, fmin:40, fmax:16000, minDb:-82, maxDb:-14,
+    tilt:2.4, smoothing:0.72, release:0.86,
+    peakHold:true, peakHoldMs:650, peakFall:0.004,
+    labels:true, splitMid:0.6, splitHigh:0.82,
+    colLow:"#39ff6a", colMid:"#ffc234", colHigh:"#ff3b30", colPeak:"#eafff0", colOff:"#132a1c"
+  };
+  const KEY="vinylEqCfg";
+  const qs=new URLSearchParams(location.search);
+  let cfg=Object.assign({}, DEFAULTS, load());
+  if(qs.get("stream")) cfg.stream=qs.get("stream");
+  function load(){ try{return JSON.parse(localStorage.getItem(KEY))||{};}catch(e){return {};} }
+  function save(){ try{localStorage.setItem(KEY,JSON.stringify(cfg));}catch(e){} }
+
+  const hdr=document.getElementById("hdr"), statusEl=document.getElementById("status");
+  const cL=document.getElementById("cL"), cR=document.getElementById("cR");
+  const xL=cL.getContext("2d"), xR=cR.getContext("2d");
+  const foot=document.getElementById("foot");
+  let ctx,aL,aR,freqL,freqR,audio,running=false,dpr=1,edges=[],st;
+  const PADBOT=18;
+
+  function rebuild(){                       // (re)compute band edges + per-band state
+    edges=[]; for(let i=0;i<=cfg.bands;i++) edges.push(cfg.fmin*Math.pow(cfg.fmax/cfg.fmin,i/cfg.bands));
+    st={L:mk(),R:mk()};
+    foot.textContent=cfg.bands+" bands · "+Math.round(cfg.fmin)+"–"+(cfg.fmax>=1000?(cfg.fmax/1000)+"k":cfg.fmax)+" Hz";
+    function mk(){return {v:new Float32Array(cfg.bands),p:new Float32Array(cfg.bands),ph:new Float32Array(cfg.bands)};}
+  }
+  function applyAudio(){ if(aL){[aL,aR].forEach(a=>{a.smoothingTimeConstant=cfg.smoothing;a.minDecibels=cfg.minDb;a.maxDecibels=cfg.maxDb;});} }
+
+  function fit(c){const r=c.getBoundingClientRect();dpr=Math.min(2,window.devicePixelRatio||1);
+    c.width=Math.max(1,r.width*dpr);c.height=Math.max(1,r.height*dpr);}
+  function fitAll(){fit(cL);fit(cR);drawLabels(xL,cL);drawLabels(xR,cR);}
+  window.addEventListener("resize",fitAll);
+
+  function fLabel(f){ if(f>=1000){const k=f/1000;return (k<10?k.toFixed(1):Math.round(k))+"k";} return String(Math.round(f)); }
+  function drawLabels(x,c){
+    const W=c.width,H=c.height,padX=8*dpr,gw=(W-padX*2)/cfg.bands,pb=PADBOT*dpr;
+    x.clearRect(0,H-pb,W,pb);
+    if(!cfg.labels) return;
+    x.fillStyle="#63707c";x.textAlign="center";x.textBaseline="alphabetic";
+    x.font="700 "+Math.round(8.5*dpr)+"px ui-monospace,monospace";
+    for(let b=0;b<cfg.bands;b++){const cx=padX+b*gw+gw*0.5,cf=Math.sqrt(edges[b]*edges[b+1]);x.fillText(fLabel(cf),cx,H-5*dpr);}
+  }
+
+  function levels(an,fr){
+    an.getByteFrequencyData(fr);
+    const sr=ctx.sampleRate,n=fr.length,binHz=(sr/2)/n,out=new Float32Array(cfg.bands);
+    for(let b=0;b<cfg.bands;b++){
+      const lo=Math.floor(edges[b]/binHz),hi=Math.max(lo+1,Math.floor(edges[b+1]/binHz));
+      let s=0,c=0; for(let k=lo;k<hi&&k<n;k++){s+=fr[k];c++;}
+      let v=c?(s/c)/255:0;
+      v=Math.min(1, v*(0.7 + cfg.tilt*(b/Math.max(1,cfg.bands-1))));   // treble tilt
+      out[b]=v;
+    }
+    return out;
+  }
+
+  function draw(x,c,S){
+    const W=c.width,H=c.height,padBot=PADBOT*dpr,padX=8*dpr,padTop=10*dpr,NSEG=cfg.segments;
+    x.clearRect(0,0,W,H-padBot);
+    const gw=(W-padX*2)/cfg.bands, barW=gw*0.68;
+    const gh=H-padTop-padBot, segH=gh/NSEG, litH=Math.max(1,segH*0.72);
+    for(let b=0;b<cfg.bands;b++){
+      const bx=padX+b*gw+gw*0.16;
+      const litN=Math.round(S.v[b]*NSEG), peakN=Math.round(S.p[b]*NSEG);
+      for(let s=0;s<NSEG;s++){
+        const t=s/(NSEG-1), y=padTop+(NSEG-1-s)*segH, on=s<litN, isPeak=(cfg.peakHold&&peakN>0&&s===peakN-1);
+        x.fillStyle = isPeak ? cfg.colPeak : (on ? (t<cfg.splitMid?cfg.colLow:t<cfg.splitHigh?cfg.colMid:cfg.colHigh) : cfg.colOff);
+        x.fillRect(bx,y,barW,litH);
+      }
+    }
+  }
+
+  function loop(){
+    if(!running) return;
+    const bl=levels(aL,freqL), br=levels(aR,freqR);
+    const holdFrames=cfg.peakHoldMs*0.06;
+    [["L",bl],["R",br]].forEach(([side,arr])=>{
+      const S=st[side];
+      for(let b=0;b<cfg.bands;b++){
+        S.v[b]= arr[b]>S.v[b] ? arr[b] : S.v[b]*cfg.release+arr[b]*(1-cfg.release);
+        if(arr[b]>S.p[b]){ S.p[b]=Math.max(S.p[b],S.v[b]); }
+        if(S.v[b]>S.p[b]){ S.p[b]=S.v[b]; S.ph[b]=holdFrames; }
+        else if(S.ph[b]>0){ S.ph[b]--; }
+        else { S.p[b]=Math.max(S.v[b], S.p[b]-cfg.peakFall); }
+      }
+    });
+    draw(xL,cL,st.L); draw(xR,cR,st.R);
+    requestAnimationFrame(loop);
+  }
+
+  function setStatus(on,t){statusEl.textContent=t;hdr.classList.toggle("on",on);}
+
+  async function begin(){
+    ctx=new (window.AudioContext||window.webkitAudioContext)();
+    try{ await ctx.resume(); }catch(e){}
+    audio=new Audio(); audio.crossOrigin="anonymous"; audio.preload="none";
+    audio.addEventListener("playing",()=>setStatus(true,"live"));
+    audio.addEventListener("ended",()=>{setStatus(false,"needle up");setTimeout(connect,3000);});
+    audio.addEventListener("error",()=>{setStatus(false,"waiting for needle…");setTimeout(connect,3000);});
+    const src=ctx.createMediaElementSource(audio), split=ctx.createChannelSplitter(2);
+    aL=ctx.createAnalyser(); aR=ctx.createAnalyser();
+    [aL,aR].forEach(a=>a.fftSize=4096); applyAudio();
+    src.connect(split); split.connect(aL,0); split.connect(aR,1);
+    const g=ctx.createGain(); g.gain.value=0; aL.connect(g); aR.connect(g); g.connect(ctx.destination);
+    freqL=new Uint8Array(aL.frequencyBinCount); freqR=new Uint8Array(aR.frequencyBinCount);
+    running=true; loop(); connect();
+  }
+  function connect(){
+    setStatus(false,"connecting…");
+    audio.src=cfg.stream+(cfg.stream.includes("?")?"&":"?")+"_="+Date.now();
+    audio.play().then(()=>setStatus(true,"live")).catch(()=>{setStatus(false,"waiting for needle…");setTimeout(connect,3000);});
+  }
+
+  // ---- settings panel wiring ----
+  const panel=document.getElementById("panel");
+  document.getElementById("gear").onclick=()=>panel.classList.toggle("open");
+  document.getElementById("closeP").onclick=()=>panel.classList.remove("open");
+  const RANGES=["bands","segments","maxDb","tilt","fmin","fmax","smoothing","release","peakHoldMs","peakFall","splitMid","splitHigh"];
+  const COLORS=["colLow","colMid","colHigh","colPeak","colOff"];
+  const CHECKS=["peakHold","labels"];
+  function syncUI(){
+    RANGES.forEach(k=>{const el=document.getElementById(k);el.value=cfg[k];const v=document.getElementById("v_"+k);if(v)v.textContent=fmt(k,cfg[k]);});
+    COLORS.forEach(k=>document.getElementById(k).value=cfg[k]);
+    CHECKS.forEach(k=>document.getElementById(k).checked=!!cfg[k]);
+  }
+  function fmt(k,v){ if(k==="maxDb")return v+" dB"; if(k==="peakHoldMs")return v+" ms"; if(k==="fmin"||k==="fmax")return v>=1000?(v/1000)+"k Hz":v+" Hz"; if(k==="smoothing"||k==="release"||k==="splitMid"||k==="splitHigh")return (+v).toFixed(2); if(k==="peakFall")return (+v).toFixed(3); return v; }
+  RANGES.forEach(k=>document.getElementById(k).addEventListener("input",e=>{
+    cfg[k]= (k==="bands"||k==="segments"||k==="maxDb"||k==="peakHoldMs"||k==="fmin"||k==="fmax") ? parseInt(e.target.value) : parseFloat(e.target.value);
+    const v=document.getElementById("v_"+k); if(v)v.textContent=fmt(k,cfg[k]);
+    if(k==="bands"||k==="fmin"||k==="fmax"){ rebuild(); fitAll(); }
+    if(k==="maxDb"||k==="smoothing") applyAudio();
+    save();
+  }));
+  COLORS.forEach(k=>document.getElementById(k).addEventListener("input",e=>{cfg[k]=e.target.value;save();}));
+  CHECKS.forEach(k=>document.getElementById(k).addEventListener("change",e=>{cfg[k]=e.target.checked;if(k==="labels")fitAll();save();}));
+  document.getElementById("reset").onclick=()=>{cfg=Object.assign({},DEFAULTS,{stream:cfg.stream});save();rebuild();applyAudio();syncUI();fitAll();};
+
+  // ---- boot (auto-start; kiosk: launch chromium --autoplay-policy=no-user-gesture-required) ----
+  rebuild(); syncUI(); fitAll();
+  document.getElementById("src").textContent=(cfg.stream||"").replace(/^https?:\/\//,"").slice(0,28);
+  function boot(){ begin().catch(()=>{}); }
+  if(document.readyState==="complete") boot(); else window.addEventListener("load",boot);
+  const kick=()=>{ if(ctx&&ctx.state==="suspended")ctx.resume().catch(()=>{}); if(audio)audio.play().catch(()=>{}); };
+  ["click","keydown","touchstart"].forEach(ev=>document.addEventListener(ev,e=>{ if(!panel.contains(e.target)) kick(); }));
+})();
+</script>
+</body>
+</html>

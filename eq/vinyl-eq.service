@@ -1,0 +1,16 @@
+[Unit]
+Description=Vinyl EQ visualizer (static web page)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+# Change the port here — this is the "chooseable port" for the end user.
+Environment=VINYL_EQ_PORT=8080
+ExecStart=/usr/bin/python3 /home/pi/vinyl-eq/serve.py
+WorkingDirectory=/home/pi/vinyl-eq
+Restart=always
+RestartSec=5
+User=pi
+
+[Install]
+WantedBy=multi-user.target
