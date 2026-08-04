@@ -100,7 +100,9 @@
 <script>
 (() => {
   const DEFAULTS = {
-    stream:"http://192.168.1.158:8005/live",
+    // Defaults to the host this page is served from (loopback when run on the box itself).
+    // Override per-viewer with ?stream=<url>. No hardcoded addresses.
+    stream: location.protocol + "//" + (location.hostname || "127.0.0.1") + ":8005/live",
     bands:20, segments:28, fmin:40, fmax:16000, minDb:-82, maxDb:-14,
     tilt:2.4, smoothing:0.72, release:0.86,
     peakHold:true, peakHoldMs:650, peakFall:0.004,
@@ -111,6 +113,7 @@
   const qs=new URLSearchParams(location.search);
   let cfg=Object.assign({}, DEFAULTS, load());
   if(qs.get("stream")) cfg.stream=qs.get("stream");
+  const DEMO=qs.has("demo");   // ?demo = synthetic animated spectrum (no audio needed; for screenshots/preview)
   function load(){ try{return JSON.parse(localStorage.getItem(KEY))||{};}catch(e){return {};} }
   function save(){ try{localStorage.setItem(KEY,JSON.stringify(cfg));}catch(e){} }
 
@@ -144,6 +147,16 @@
     for(let b=0;b<cfg.bands;b++){const cx=padX+b*gw+gw*0.5,cf=Math.sqrt(edges[b]*edges[b+1]);x.fillText(fLabel(cf),cx,H-5*dpr);}
   }
 
+  function demoArr(off,t){          // synthetic musical-looking spectrum for ?demo previews
+    const a=new Float32Array(cfg.bands);
+    for(let b=0;b<cfg.bands;b++){
+      const n=b/Math.max(1,cfg.bands-1);
+      let v=0.85*Math.exp(-Math.pow((n-0.16)/0.33,2))+0.42*Math.exp(-Math.pow((n-0.68)/0.22,2));
+      v*=0.72+0.30*Math.sin(t*2.1+b*0.7+off*3)+0.07*Math.sin(t*7+b*1.3);
+      a[b]=Math.max(0.05,Math.min(1,v));
+    }
+    return a;
+  }
   function levels(an,fr){
     an.getByteFrequencyData(fr);
     const sr=ctx.sampleRate,n=fr.length,binHz=(sr/2)/n,out=new Float32Array(cfg.bands);
@@ -175,7 +188,8 @@
 
   function loop(){
     if(!running) return;
-    const bl=levels(aL,freqL), br=levels(aR,freqR);
+    const bl = DEMO ? demoArr(0, performance.now()/1000) : levels(aL,freqL);
+    const br = DEMO ? demoArr(0.5, performance.now()/1000) : levels(aR,freqR);
     const holdFrames=cfg.peakHoldMs*0.06;
     [["L",bl],["R",br]].forEach(([side,arr])=>{
       const S=st[side];
@@ -241,7 +255,7 @@
   // ---- boot (auto-start; kiosk: launch chromium --autoplay-policy=no-user-gesture-required) ----
   rebuild(); syncUI(); fitAll();
   document.getElementById("src").textContent=(cfg.stream||"").replace(/^https?:\/\//,"").slice(0,28);
-  function boot(){ begin().catch(()=>{}); }
+  function boot(){ if(DEMO){ running=true; setStatus(true,"demo"); loop(); return; } begin().catch(()=>{}); }
   if(document.readyState==="complete") boot(); else window.addEventListener("load",boot);
   const kick=()=>{ if(ctx&&ctx.state==="suspended")ctx.resume().catch(()=>{}); if(audio)audio.play().catch(()=>{}); };
   ["click","keydown","touchstart"].forEach(ev=>document.addEventListener(ev,e=>{ if(!panel.contains(e.target)) kick(); }));

@@ -5,6 +5,10 @@ per-channel (L/R), green→amber→red with slow retro peak-hold caps. Pure HTML
 (Web Audio API), no build step, no dependencies. Made to sit on a little display next to
 a turntable, but it'll visualize *any* Icecast/HTTP audio stream.
 
+![Vinyl EQ — retro stereo graphic equalizer](docs/screenshot.png)
+
+*(preview rendered with `?demo`, a synthetic spectrum — the real thing reacts to your stream)*
+
 ## Quick start
 
 ```bash
@@ -19,7 +23,7 @@ Point it at your stream with the `?stream=` query param, or edit the default in
 `index.html`:
 
 ```
-http://<host>:<port>/?stream=http://192.168.1.50:8005/live
+http://<host>:<port>/?stream=http://your-icecast-host:8005/live
 ```
 
 ### CORS (important)
