@@ -174,6 +174,26 @@ the kind of contribution this repo wants.
 
 ---
 
+## 🎚️ Vinyl EQ visualizer (optional)
+
+A retro **stereo graphic-EQ** web display for the live stream — segmented LED
+bars per channel, slow retro peak-hold caps, fully tunable. It runs as its own
+tiny service on a configurable port and reads the same Icecast `/live` mount, so
+it's made for a little screen sitting next to the deck.
+
+![Vinyl EQ](eq/docs/screenshot.png)
+
+- **Auto-starts** (kiosk-friendly) with a ⚙ **settings panel** — colors, bands,
+  segments, treble tilt, low/high cutoffs, sensitivity, peak-hold, and more — all
+  live and saved in the browser.
+- One requirement on Icecast: an `Access-Control-Allow-Origin: *` header so the
+  page can read the stream from its own origin (the setup steps are in `eq/`).
+- Preview it without audio via `?demo`.
+
+**→ Full docs & setup: [`eq/`](eq/).**
+
+---
+
 ## Troubleshooting
 
 | Symptom | Likely cause / fix |
